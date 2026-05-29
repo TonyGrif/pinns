@@ -11,10 +11,9 @@ pyproject.toml  # Project Build File
 
 ## Development
 This project makes use of [uv](https://docs.astral.sh/uv/) for dependency management.
-After cloning, install dependencies and set up git hooks using:
+After cloning, install dependencies using:
 ```bash
 uv sync
-uv run poe setup
 ```
 
 ### Additional Dependencies
