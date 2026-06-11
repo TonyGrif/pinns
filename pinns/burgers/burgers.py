@@ -156,7 +156,7 @@ class BurgersPINN:
             loss.backward()
             optimizer.step()
             history.append(loss.item())
-            if epoch % 100 == 0:
+            if epoch % 1000 == 0:
                 logger.info("[NN]   epoch %5d  loss = %.6e", epoch, loss.item())
                 if self._plot_config is not None:
                     cfg = self._plot_config
@@ -224,8 +224,83 @@ class BurgersPINN:
             loss.backward()
             optimizer.step()
             history.append(loss.item())
-            if epoch % 100 == 0:
+            if epoch % 1000 == 0:
                 logger.info("[PINN] epoch %5d  loss = %.6e", epoch, loss.item())
+                if self._plot_config is not None:
+                    cfg = self._plot_config
+                    plot_heatmap(
+                        self,
+                        epoch,
+                        cfg.X_star,
+                        cfg.Exact,
+                        cfg.X,
+                        cfg.T,
+                        cfg.tag,
+                        cfg.out_dir,
+                    )
+                    plot_error(
+                        self,
+                        epoch,
+                        cfg.X_star,
+                        cfg.Exact,
+                        cfg.X,
+                        cfg.T,
+                        cfg.tag,
+                        cfg.out_dir,
+                    )
+                    plot_slices(
+                        self, epoch, cfg.x, cfg.t, cfg.Exact, cfg.tag, cfg.out_dir
+                    )
+
+        return history
+
+    def fit_noisy_pinn(
+        self,
+        X_u: np.ndarray,
+        u: np.ndarray,
+        X_f: np.ndarray,
+        epochs: int,
+        noise_level: float = 0.01,
+        lr: float = 1e-3,
+    ) -> list[float]:
+        """Train with Gaussian noise
+
+        Args:
+            X_u: Boundary/IC data points
+            u: Observed solution values
+            X_f: Collocation points
+            epochs: Number of gradient steps
+            noise_level: Noise magnitude as a fraction
+            lr: Adam learning rate
+
+        Returns:
+            Loss history
+        """
+        u_noisy = u + noise_level * np.std(u) * np.random.randn(*u.shape)
+        logger.info(
+            "[NOISY PINN] noise_level=%.3f  std(u)=%.4e", noise_level, np.std(u)
+        )
+
+        X_u_t = self._to_tensor(X_u)
+        u_t = self._to_tensor(u_noisy)
+        X_f_t = self._to_tensor(X_f)
+        optimizer = torch.optim.Adam(self.net.parameters(), lr=lr)
+        history: list[float] = []
+
+        for epoch in range(epochs):
+            optimizer.zero_grad()
+
+            X_f_r = X_f_t.clone().detach().requires_grad_(True)
+
+            data_loss = torch.mean((self.forward(X_u_t) - u_t) ** 2)
+            phys_loss = torch.mean(self.residual(X_f_r) ** 2)
+            loss = data_loss + phys_loss
+
+            loss.backward()
+            optimizer.step()
+            history.append(loss.item())
+            if epoch % 1000 == 0:
+                logger.info("[NOISY PINN] epoch %5d  loss = %.6e", epoch, loss.item())
                 if self._plot_config is not None:
                     cfg = self._plot_config
                     plot_heatmap(

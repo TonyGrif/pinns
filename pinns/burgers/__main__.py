@@ -10,6 +10,7 @@ import torch
 from scipy.stats.qmc import LatinHypercube
 
 from pinns.burgers.burgers import BurgersPINN
+from pinns.burgers.plot import plot_collocation, plot_dataset, plot_exact
 from pinns.net import Net
 
 logger = logging.getLogger(__name__)
@@ -18,7 +19,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 NU = 0.01 / np.pi
 N_U = 100
 N_F = 10000
-EPOCHS = 10000
+EPOCHS = 50000
 LR = 1e-3
 
 
@@ -58,6 +59,11 @@ def main() -> None:
     X_f_train = lb + (ub - lb) * sampler.random(n=N_F)
     X_f_train = np.vstack([X_f_train, X_u_all])
 
+    # Dataset diagnostics
+    plot_exact(x, t, Exact, out_dir=Path("plots"))
+    plot_dataset(x, t, Exact, X_u_train, out_dir=Path("plots"))
+    plot_collocation(x, t, Exact, X_u_train, X_f_train, out_dir=Path("plots"))
+
     # Standard NN
     logger.info("Training: Standard NN")
     net_nn = Net(input_dim=2, hidden_dim=20, layers=8, output_dim=1, device=DEVICE)
@@ -89,9 +95,47 @@ def main() -> None:
     u_pred_pinn = model_pinn.predict(X_star)
     error_pinn = np.linalg.norm(u_star - u_pred_pinn, 2) / np.linalg.norm(u_star, 2)
 
+    # Noisy PINN - 1%
+    logger.info("Training: Noisy PINN (1%% noise)")
+    net_noisy1 = Net(input_dim=2, hidden_dim=20, layers=8, output_dim=1, device=DEVICE)
+    model_noisy1 = BurgersPINN(net=net_noisy1, lb=lb, ub=ub, nu=NU)
+    model_noisy1._set_plot_config(
+        X_star, Exact, X, T, x, t, tag="noisy1", out_dir=Path("plots/noisy1")
+    )
+
+    t0 = time.time()
+    model_noisy1.fit_noisy_pinn(
+        X_u_train, u_train, X_f_train, epochs=EPOCHS, noise_level=0.01, lr=LR
+    )
+    logger.info("Training time: %.2fs", time.time() - t0)
+
+    u_pred_noisy1 = model_noisy1.predict(X_star)
+    error_noisy1 = np.linalg.norm(u_star - u_pred_noisy1, 2) / np.linalg.norm(u_star, 2)
+
+    # Noisy PINN - 10%
+    logger.info("Training: Noisy PINN (10%% noise)")
+    net_noisy10 = Net(input_dim=2, hidden_dim=20, layers=8, output_dim=1, device=DEVICE)
+    model_noisy10 = BurgersPINN(net=net_noisy10, lb=lb, ub=ub, nu=NU)
+    model_noisy10._set_plot_config(
+        X_star, Exact, X, T, x, t, tag="noisy10", out_dir=Path("plots/noisy10")
+    )
+
+    t0 = time.time()
+    model_noisy10.fit_noisy_pinn(
+        X_u_train, u_train, X_f_train, epochs=EPOCHS, noise_level=0.10, lr=LR
+    )
+    logger.info("Training time: %.2fs", time.time() - t0)
+
+    u_pred_noisy10 = model_noisy10.predict(X_star)
+    error_noisy10 = np.linalg.norm(u_star - u_pred_noisy10, 2) / np.linalg.norm(
+        u_star, 2
+    )
+
     # Results
-    logger.info("L2 error  Standard NN : %.4e", error_nn)
-    logger.info("L2 error  PINN        : %.4e", error_pinn)
+    logger.info("L2 error  Standard NN      : %.4e", error_nn)
+    logger.info("L2 error  PINN             : %.4e", error_pinn)
+    logger.info("L2 error  Noisy PINN  1%%  : %.4e", error_noisy1)
+    logger.info("L2 error  Noisy PINN 10%%  : %.4e", error_noisy10)
 
 
 if __name__ == "__main__":
