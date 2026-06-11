@@ -4,7 +4,10 @@ version = "0.1.0"
 description = "Physics Informed Neural Networks"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+    "matplotlib>=3.10.9",
+    "scipy>=1.15.3",
+]
 
 [dependency-groups]
 dev = [
@@ -12,6 +15,7 @@ dev = [
     "poethepoet>=0.46.0",
     "pre-commit>=4.6.0",
     "ruff>=0.15.15",
+    "scipy-stubs>=1.15.3.0",
     "torch>=2.12.0", # For dev checks, use version on server for runtime
 ]
 
