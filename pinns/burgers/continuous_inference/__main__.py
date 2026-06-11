@@ -10,11 +10,7 @@ import torch
 from scipy.stats.qmc import LatinHypercube
 
 from pinns.burgers.continuous_inference.burgers import BurgersPINN
-from pinns.burgers.continuous_inference.plot import (
-    plot_collocation,
-    plot_dataset,
-    plot_exact,
-)
+from pinns.burgers.plot import plot_collocation, plot_dataset, plot_exact
 from pinns.net import Net
 
 logger = logging.getLogger(__name__)
