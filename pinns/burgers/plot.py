@@ -1,9 +1,183 @@
-"""Shared visualization utilities for Burgers' equation datasets"""
+"""Shared visualization utilities for Burgers' equation"""
 
+from __future__ import annotations
+
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
 
 import matplotlib.pyplot as plt
 import numpy as np
+
+
+class _Predictable(Protocol):
+    def predict(self, X: np.ndarray) -> np.ndarray: ...
+
+
+@dataclass
+class PlotConfig:
+    """Data needed to generate plots during training
+
+    Attributes:
+        X_star: All evaluation points
+        Exact: Exact solution
+        X: Spatial meshgrid
+        T: Temporal meshgrid
+        x: Spatial grid
+        t: Temporal grid
+        tag: Label string used in filenames and titles
+        out_dir: Directory to save plots
+    """
+
+    X_star: np.ndarray
+    Exact: np.ndarray
+    X: np.ndarray
+    T: np.ndarray
+    x: np.ndarray
+    t: np.ndarray
+    tag: str
+    out_dir: Path
+
+
+def plot_heatmap(
+    model: _Predictable,
+    epoch: int,
+    X_star: np.ndarray,
+    Exact: np.ndarray,
+    X: np.ndarray,
+    T: np.ndarray,
+    tag: str,
+    out_dir: Path,
+) -> None:
+    """Side-by-side heatmap of the predicted and exact state
+
+    Args:
+        model: Model with a ``predict(X) -> np.ndarray`` method
+        epoch: Current training epoch
+        X_star: All evaluation points
+        Exact: Exact solution
+        X: Spatial meshgrid
+        T: Temporal meshgrid
+        tag: Label string
+        out_dir: Directory to save the figure
+    """
+    u_pred = model.predict(X_star).reshape(X.shape)
+
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+    for ax, field, title in zip(
+        axes,
+        [u_pred, Exact],
+        [f"Predicted ({tag.upper()})", "Exact"],
+    ):
+        im = ax.imshow(
+            field.T,
+            interpolation="nearest",
+            cmap="rainbow",
+            extent=(T.min(), T.max(), X.min(), X.max()),
+            origin="lower",
+            aspect="auto",
+        )
+        ax.set_xlabel("$t$")
+        ax.set_ylabel("$x$")
+        ax.set_title(title)
+        fig.colorbar(im, ax=ax)
+
+    fig.suptitle(f"State at Epoch {epoch}")
+    fig.tight_layout()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_dir / f"{tag}_heatmap_{epoch:05d}.png", dpi=300)
+    plt.close(fig)
+
+
+def plot_error(
+    model: _Predictable,
+    epoch: int,
+    X_star: np.ndarray,
+    Exact: np.ndarray,
+    X: np.ndarray,
+    T: np.ndarray,
+    tag: str,
+    out_dir: Path,
+) -> None:
+    """Save an absolute error heatmap
+
+    Args:
+        model: Model with a ``predict(X) -> np.ndarray`` method
+        epoch: Current training epoch
+        X_star: All evaluation points
+        Exact: Exact solution
+        X: Spatial meshgrid
+        T: Temporal meshgrid
+        tag: Label string
+        out_dir: Directory to save the figure
+    """
+    u_pred = model.predict(X_star).reshape(X.shape)
+    error = np.abs(Exact - u_pred)
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+    im = ax.imshow(
+        error.T,
+        interpolation="nearest",
+        cmap="hot",
+        extent=(T.min(), T.max(), X.min(), X.max()),
+        origin="lower",
+        aspect="auto",
+    )
+    ax.set_xlabel("$t$")
+    ax.set_ylabel("$x$")
+    ax.set_title(f"Absolute Error - {tag.upper()} at Epoch {epoch}")
+    fig.colorbar(im, ax=ax)
+    fig.tight_layout()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_dir / f"{tag}_error_{epoch:05d}.png", dpi=300)
+    plt.close(fig)
+
+
+def plot_slices(
+    model: _Predictable,
+    epoch: int,
+    x: np.ndarray,
+    t: np.ndarray,
+    Exact: np.ndarray,
+    tag: str,
+    out_dir: Path,
+) -> None:
+    """Line plot slices at t=0.25, 0.50, 0.75
+
+    Args:
+        model: Model with a ``predict(X) -> np.ndarray`` method
+        epoch: Current training epoch
+        x: Spatial grid
+        t: Temporal grid
+        Exact: Exact solution
+        tag: Label string
+        out_dir: Directory to save the figure
+    """
+    t_flat = t.flatten()
+    snap_fracs = [0.25, 0.50, 0.75]
+    snap_indices = [int(f * (len(t_flat) - 1)) for f in snap_fracs]
+
+    fig, axes = plt.subplots(1, 3, figsize=(12, 4), sharey=True)
+    for ax, idx, frac in zip(axes, snap_indices, snap_fracs):
+        t_val = t_flat[idx]
+        t_col = np.full_like(x, t_val)
+        X_slice = np.hstack([x, t_col])
+        u_pred = model.predict(X_slice).flatten()
+
+        ax.plot(x.flatten(), Exact[idx, :], "b-", linewidth=2, label="Exact")
+        ax.plot(x.flatten(), u_pred, "r--", linewidth=2, label=f"{tag.upper()}")
+        ax.set_xlabel("$x$")
+        ax.set_ylabel("$u(t, x)$")
+        ax.set_title(f"$t = {frac:.2f}$")
+        ax.set_xlim([-1.1, 1.1])
+        ax.set_ylim([-1.1, 1.1])
+        ax.legend(frameon=False)
+
+    fig.suptitle(f"Solution Slices at Epoch {epoch}")
+    fig.tight_layout()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_dir / f"{tag}_slices_{epoch:05d}.png", dpi=300)
+    plt.close(fig)
 
 
 def plot_exact(
