@@ -6,7 +6,12 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from pinns.burgers.plot import PlotConfig, plot_error, plot_heatmap, plot_slices
+from pinns.burgers.continuous_inference.plot import (
+    PlotConfig,
+    plot_error,
+    plot_heatmap,
+    plot_slices,
+)
 from pinns.net import Net
 
 logger = logging.getLogger(__name__)

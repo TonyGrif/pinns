@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 if TYPE_CHECKING:
-    from pinns.burgers.burgers import BurgersPINN
+    from pinns.burgers.continuous_inference.burgers import BurgersPINN
 
 
 @dataclass
